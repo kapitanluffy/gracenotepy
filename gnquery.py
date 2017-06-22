@@ -79,10 +79,21 @@ class GnQuery(object):
         valueElem = xml.etree.ElementTree.SubElement(option, 'VALUE')
         valueElem.text = value
 
+    def coverSize(self, value):
+        self.addOption('COVER_SIZE', value)
+
     def selectDetail(self, value='GENRE:3LEVEL,MOOD:2LEVEL,TEMPO:3LEVEL,ARTIST_ORIGIN:4LEVEL,ARTIST_ERA:2LEVEL,ARTIST_TYPE:2LEVEL'):
         query = self.root.find('QUERY')
         option = xml.etree.ElementTree.SubElement(query, 'OPTION')
         parameter = xml.etree.ElementTree.SubElement(option, 'PARAMETER')
         parameter.text = 'SELECT_DETAIL'
+        valueElem = xml.etree.ElementTree.SubElement(option, 'VALUE')
+        valueElem.text = value
+
+    def addOption(self, name, value):
+        query = self.root.find('QUERY')
+        option = xml.etree.ElementTree.SubElement(query, 'OPTION')
+        parameter = xml.etree.ElementTree.SubElement(option, 'PARAMETER')
+        parameter.text = name
         valueElem = xml.etree.ElementTree.SubElement(option, 'VALUE')
         valueElem.text = value

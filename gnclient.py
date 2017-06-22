@@ -48,12 +48,30 @@ class GnClient(object):
     def search(self, track=None, artist=None, album=None):
         query = self.query()
         query.search(track=track, artist=artist, album=album)
-        return self.request()
+        query.selectExtended('COVER,REVIEW,ARTIST_BIOGRAPHY,ARTIST_IMAGE')
+        query.coverSize('xlarge')
+        response = self.request()
 
-    def page(self, page):
+        albumsXml = response.findall('ALBUM')
+        tracks = []
+
+        for albumXml in albumsXml:
+            track = GnTrack(albumXml)
+            tracks.append(track)
+
+        # range
+        rangeXml = response.find('RANGE')
+        resultsRange = {}
+        resultsRange['total'] = rangeXml.findtext('COUNT', '0')
+        resultsRange['start'] = rangeXml.findtext('START', '1')
+        resultsRange['end'] = rangeXml.findtext('END', '10')
+
+        return tracks
+
+    def page(self, page, limit=20):
         query = self.query()
-        end = page*10
-        start = end-9
+        end = int(page) * int(limit)
+        start = int(end) - ( int(limit) - 1 )
         query.range(start, end)
 
         return self
@@ -72,4 +90,40 @@ class GnClient(object):
             message = responseTree.find('MESSAGE')
             raise Exception(message.text)
 
-        return responseXml
+        return resp
+
+class GnTrack(dict):
+    def __init__(self, albumXml):
+        trackXml = albumXml.find('TRACK')
+        self['title'] = self.__normalizeText('TITLE', trackXml)
+        self['track_num'] = self.__normalizeText('TRACK_NUM', trackXml)
+        self['track_genre'] = self.__normalizeText('GENRE', trackXml)
+        self['artist'] = self.__normalizeText('ARTIST', albumXml)
+        self['album'] = self.__normalizeText('TITLE', albumXml)
+        self['album_track_count'] = self.__normalizeText('TRACK_COUNT', albumXml)
+        self['album_genre'] = self.__normalizeText('GENRE', albumXml)
+        self['year'] = self.__normalizeText('DATE', albumXml)
+        self['artist_image'] = {'width': 0, 'height': 0, 'url': None}
+        self['album_cover'] = {'width': 0, 'height': 0, 'url': None}
+
+        urlsXml = albumXml.findall('URL')
+        for urlXml in urlsXml:
+            if urlXml.attrib['TYPE'] == 'ARTIST_IMAGE':
+                key = 'artist_image'
+            if urlXml.attrib['TYPE'] == 'COVERART':
+                key = 'album_cover'
+
+            self[key]['width'] = urlXml.attrib['WIDTH']
+            self[key]['height'] = urlXml.attrib['HEIGHT']
+            self[key]['url'] = urlXml.text
+
+        # Gracenote ids
+        self['gn_meta'] = {}
+        self['gn_meta']['track_gn_id'] = self.__normalizeText('GN_ID', trackXml)
+        self['gn_meta']['album_gn_id'] = self.__normalizeText('GN_ID', albumXml)
+
+    def __normalizeText(self, name, _xml, unquote = True):
+        t = _xml.findtext(name, None)
+        if t is not None and unquote is True:
+            t = urllib_parse.unquote(t)
+        return t
